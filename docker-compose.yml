@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  delulu-api:
+    build: .
+    container_name: delulu-api
+    ports:
+      - "8000:8000"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8000
+    volumes:
+      - ./.env:/app/.env
+      - ./license.key:/app/license.key
+    # Uncomment the deploy block below if you have an NVIDIA GPU and nvidia-docker installed
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+    restart: unless-stopped

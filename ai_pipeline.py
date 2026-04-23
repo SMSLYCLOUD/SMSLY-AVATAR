@@ -2,12 +2,15 @@ import torch
 from diffusers import AutoPipelineForImage2Image
 from diffusers.utils import load_image
 from PIL import Image
+import logging
+
+logger = logging.getLogger(__name__)
 
 class ImageTransformer:
     def __init__(self):
         # Determine the device to run on
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        print(f"Loading model on {self.device}...")
+        logger.info(f"Loading model on {self.device}...")
 
         # Using SD-Turbo for fast image-to-image processing.
         # For production with better quality, consider SDXL or SD 1.5,
@@ -21,7 +24,7 @@ class ImageTransformer:
             variant="fp16" if self.device == "cuda" else None
         )
         self.pipeline = self.pipeline.to(self.device)
-        print("Model loaded successfully.")
+        logger.info("Model loaded successfully.")
 
     def transform_image(self, init_image: Image.Image, prompt: str, strength: float = 0.5, num_inference_steps: int = 2) -> Image.Image:
         """
