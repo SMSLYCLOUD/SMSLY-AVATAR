@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Delulu Clone</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f2f5;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        header {
+            background-color: #ff6b6b;
+            color: white;
+            width: 100%;
+            text-align: center;
+            padding: 1rem 0;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .container {
+            max-width: 800px;
+            width: 90%;
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            margin-top: 2rem;
+        }
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        label {
+            font-weight: bold;
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+        input[type="text"], input[type="file"], input[type="range"] {
+            width: 100%;
+            padding: 0.5rem;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #ff6b6b;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            width: 100%;
+        }
+        button:hover {
+            background-color: #ee5253;
+        }
+        button:disabled {
+            background-color: #ff9f43;
+            cursor: not-allowed;
+        }
+        .results {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 2rem;
+            gap: 1rem;
+        }
+        .image-box {
+            flex: 1;
+            text-align: center;
+            border: 1px solid #ddd;
+            padding: 1rem;
+            border-radius: 5px;
+            background: #fafafa;
+        }
+        .image-box img {
+            max-width: 100%;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            margin-top: 1rem;
+            font-weight: bold;
+            color: #ff6b6b;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>✨ Delulu Clone ✨</h1>
+    <p>Apply infinite AI styles to your photos instantly!</p>
+</header>
+
+<div class="container">
+    <form id="uploadForm">
+        <div class="form-group">
+            <label for="imageFile">Upload a Photo:</label>
+            <input type="file" id="imageFile" accept="image/*" required>
+        </div>
+
+        <div class="form-group">
+            <label for="prompt">Style Prompt:</label>
+            <input type="text" id="prompt" placeholder="e.g., cyberpunk style, neon lights, masterpiece" required>
+        </div>
+
+        <div class="form-group">
+            <label for="strength">Transformation Strength: <span id="strengthValue">0.5</span></label>
+            <input type="range" id="strength" min="0.1" max="0.9" step="0.1" value="0.5">
+            <small style="color: #666;">(Lower = closer to original, Higher = more AI transformation)</small>
+        </div>
+
+        <button type="submit" id="submitBtn">✨ Transform Photo ✨</button>
+    </form>
+
+    <div class="loading" id="loadingIndicator">
+        Applying style... Please wait... (The first time might take a minute as it loads the model)
+    </div>
+
+    <div class="results" id="resultsArea" style="display: none;">
+        <div class="image-box">
+            <h3>Original</h3>
+            <img id="originalImg" src="" alt="Original Image">
+        </div>
+        <div class="image-box">
+            <h3>Transformed</h3>
+            <img id="transformedImg" src="" alt="Transformed Image">
+        </div>
+    </div>
+</div>
+
+<script>
+    const form = document.getElementById('uploadForm');
+    const imageFile = document.getElementById('imageFile');
+    const promptInput = document.getElementById('prompt');
+    const strengthInput = document.getElementById('strength');
+    const strengthValue = document.getElementById('strengthValue');
+    const submitBtn = document.getElementById('submitBtn');
+    const loadingIndicator = document.getElementById('loadingIndicator');
+    const resultsArea = document.getElementById('resultsArea');
+    const originalImg = document.getElementById('originalImg');
+    const transformedImg = document.getElementById('transformedImg');
+
+    strengthInput.addEventListener('input', (e) => {
+        strengthValue.textContent = e.target.value;
+    });
+
+    // Preview original image as soon as it's selected
+    imageFile.addEventListener('change', () => {
+        const file = imageFile.files[0];
+        if (file) {
+            const url = URL.createObjectURL(file);
+            originalImg.src = url;
+            transformedImg.src = ''; // clear previous
+            resultsArea.style.display = 'flex';
+        }
+    });
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const file = imageFile.files[0];
+        const prompt = promptInput.value;
+        const strength = strengthInput.value;
+
+        if (!file || !prompt) return;
+
+        // UI updates
+        submitBtn.disabled = true;
+        loadingIndicator.style.display = 'block';
+
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('prompt', prompt);
+        formData.append('strength', strength);
+
+        try {
+            const response = await fetch('/api/transform', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                const err = await response.text();
+                throw new Error(err);
+            }
+
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+
+            transformedImg.src = url;
+
+        } catch (error) {
+            alert('Error transforming image: ' + error.message);
+            console.error(error);
+        } finally {
+            submitBtn.disabled = false;
+            loadingIndicator.style.display = 'none';
+        }
+    });
+</script>
+
+</body>
+</html>
