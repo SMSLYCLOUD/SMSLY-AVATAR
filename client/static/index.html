@@ -40,6 +40,35 @@
             display: block;
             margin-bottom: 0.5rem;
         }
+        .mode-toggle {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 1rem;
+        }
+        .mode-toggle button {
+            background-color: #ddd;
+            color: #333;
+        }
+        .mode-toggle button.active {
+            background-color: #ff6b6b;
+            color: white;
+        }
+        .camera-container {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 1.5rem;
+        }
+        #videoFeed {
+            width: 100%;
+            max-width: 500px;
+            border-radius: 5px;
+            background-color: #000;
+        }
+        #canvasCapture {
+            display: none;
+        }
         input[type="text"], input[type="file"], input[type="range"] {
             width: 100%;
             padding: 0.5rem;
@@ -100,10 +129,22 @@
 </header>
 
 <div class="container">
+    <div class="mode-toggle">
+        <button type="button" id="btnUploadMode" class="active">Upload Photo</button>
+        <button type="button" id="btnCameraMode">Live Camera</button>
+    </div>
+
     <form id="uploadForm">
-        <div class="form-group">
+        <div class="form-group" id="uploadGroup">
             <label for="imageFile">Upload a Photo:</label>
-            <input type="file" id="imageFile" accept="image/*" required>
+            <input type="file" id="imageFile" accept="image/*">
+        </div>
+
+        <div class="camera-container" id="cameraGroup">
+            <video id="videoFeed" autoplay playsinline></video>
+            <button type="button" id="btnCapture">Capture Frame</button>
+            <canvas id="canvasCapture"></canvas>
+            <p id="captureStatus" style="color: green; font-weight: bold; display: none;">Frame Captured!</p>
         </div>
 
         <div class="form-group">
@@ -141,6 +182,20 @@
     const imageFile = document.getElementById('imageFile');
     const promptInput = document.getElementById('prompt');
     const strengthInput = document.getElementById('strength');
+
+    // UI Elements for mode toggle and camera
+    const btnUploadMode = document.getElementById('btnUploadMode');
+    const btnCameraMode = document.getElementById('btnCameraMode');
+    const uploadGroup = document.getElementById('uploadGroup');
+    const cameraGroup = document.getElementById('cameraGroup');
+    const videoFeed = document.getElementById('videoFeed');
+    const canvasCapture = document.getElementById('canvasCapture');
+    const btnCapture = document.getElementById('btnCapture');
+    const captureStatus = document.getElementById('captureStatus');
+
+    let currentMode = 'upload'; // 'upload' or 'camera'
+    let cameraStream = null;
+    let capturedBlob = null;
     const strengthValue = document.getElementById('strengthValue');
     const submitBtn = document.getElementById('submitBtn');
     const loadingIndicator = document.getElementById('loadingIndicator');
@@ -152,8 +207,72 @@
         strengthValue.textContent = e.target.value;
     });
 
-    // Preview original image as soon as it's selected
+    // Mode toggling logic
+    btnUploadMode.addEventListener('click', () => {
+        currentMode = 'upload';
+        btnUploadMode.classList.add('active');
+        btnCameraMode.classList.remove('active');
+        uploadGroup.style.display = 'block';
+        cameraGroup.style.display = 'none';
+        imageFile.required = true;
+        stopCamera();
+    });
+
+    btnCameraMode.addEventListener('click', async () => {
+        currentMode = 'camera';
+        btnCameraMode.classList.add('active');
+        btnUploadMode.classList.remove('active');
+        uploadGroup.style.display = 'none';
+        cameraGroup.style.display = 'flex';
+        imageFile.required = false;
+        await startCamera();
+    });
+
+    // Camera logic
+    async function startCamera() {
+        try {
+            cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+            videoFeed.srcObject = cameraStream;
+        } catch (err) {
+            alert('Error accessing camera: ' + err.message);
+        }
+    }
+
+    function stopCamera() {
+        if (cameraStream) {
+            cameraStream.getTracks().forEach(track => track.stop());
+            cameraStream = null;
+            videoFeed.srcObject = null;
+        }
+    }
+
+    btnCapture.addEventListener('click', () => {
+        if (!cameraStream) return;
+
+        // Setup canvas to match video dimensions
+        canvasCapture.width = videoFeed.videoWidth;
+        canvasCapture.height = videoFeed.videoHeight;
+        const ctx = canvasCapture.getContext('2d');
+        ctx.drawImage(videoFeed, 0, 0, canvasCapture.width, canvasCapture.height);
+
+        // Convert canvas to blob
+        canvasCapture.toBlob((blob) => {
+            capturedBlob = blob;
+            captureStatus.style.display = 'block';
+
+            // Preview
+            const url = URL.createObjectURL(blob);
+            originalImg.src = url;
+            transformedImg.src = '';
+            resultsArea.style.display = 'flex';
+
+            setTimeout(() => { captureStatus.style.display = 'none'; }, 2000);
+        }, 'image/jpeg', 0.9);
+    });
+
+    // Preview original image as soon as it's selected (Upload mode)
     imageFile.addEventListener('change', () => {
+        if (currentMode !== 'upload') return;
         const file = imageFile.files[0];
         if (file) {
             const url = URL.createObjectURL(file);
@@ -166,18 +285,34 @@
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
 
-        const file = imageFile.files[0];
+        let fileToUpload = null;
+
+        if (currentMode === 'upload') {
+            fileToUpload = imageFile.files[0];
+            if (!fileToUpload) {
+                alert("Please select a file to upload.");
+                return;
+            }
+        } else {
+            fileToUpload = capturedBlob;
+            if (!fileToUpload) {
+                alert("Please capture a frame from the camera first.");
+                return;
+            }
+        }
+
         const prompt = promptInput.value;
         const strength = strengthInput.value;
 
-        if (!file || !prompt) return;
+        if (!prompt) return;
 
         // UI updates
         submitBtn.disabled = true;
         loadingIndicator.style.display = 'block';
 
         const formData = new FormData();
-        formData.append('file', file);
+        // Append blob/file with a generic name if it's from camera
+        formData.append('file', fileToUpload, currentMode === 'camera' ? 'capture.jpg' : fileToUpload.name);
         formData.append('prompt', prompt);
         formData.append('strength', strength);
 
