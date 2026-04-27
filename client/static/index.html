@@ -147,9 +147,24 @@
             <p id="captureStatus" style="color: green; font-weight: bold; display: none;">Frame Captured!</p>
         </div>
 
-        <div class="form-group">
-            <label for="prompt">Style Prompt:</label>
-            <input type="text" id="prompt" placeholder="e.g., cyberpunk style, neon lights, masterpiece" required>
+        <div class="form-group" style="display: flex; gap: 10px; align-items: flex-end;">
+            <div style="flex: 1;">
+                <label for="prompt">Intent / Style Prompt:</label>
+                <input type="text" id="prompt" placeholder="e.g., Make me look like a billionaire founder in Dubai">
+            </div>
+            <button type="button" id="btnGeneratePrompt" style="width: auto;">Generate Prompt</button>
+        </div>
+
+        <div id="advancedPromptSection" style="display: none; background: #fff3f3; padding: 1rem; border-radius: 5px; margin-bottom: 1.5rem; border: 1px solid #ffcccc;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                <strong>Generated Advanced Prompt</strong>
+                <span id="riskBadge" style="padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: bold;"></span>
+            </div>
+            <textarea id="finalPrompt" rows="3" style="width: 100%; margin-bottom: 0.5rem;" required></textarea>
+            <details>
+                <summary>Raw JSON Info</summary>
+                <pre id="rawJsonInfo" style="font-size: 12px; background: #eee; padding: 0.5rem; border-radius: 3px; max-height: 150px; overflow-y: auto;"></pre>
+            </details>
         </div>
 
         <div class="form-group">
@@ -181,6 +196,11 @@
     const form = document.getElementById('uploadForm');
     const imageFile = document.getElementById('imageFile');
     const promptInput = document.getElementById('prompt');
+    const btnGeneratePrompt = document.getElementById('btnGeneratePrompt');
+    const finalPrompt = document.getElementById('finalPrompt');
+    const advancedPromptSection = document.getElementById('advancedPromptSection');
+    const riskBadge = document.getElementById('riskBadge');
+    const rawJsonInfo = document.getElementById('rawJsonInfo');
     const strengthInput = document.getElementById('strength');
 
     // UI Elements for mode toggle and camera
@@ -270,8 +290,68 @@
         }, 'image/jpeg', 0.9);
     });
 
+    async function doGeneratePrompt(intent) {
+        if (!intent) return null;
+
+        btnGeneratePrompt.disabled = true;
+        btnGeneratePrompt.textContent = "Generating...";
+
+        try {
+            const response = await fetch('/api/prompt/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_prompt: intent,
+                    style_preset: "cinematic_realism",
+                    realism_level: "high"
+                })
+            });
+
+            const data = await response.json();
+
+            advancedPromptSection.style.display = 'block';
+            finalPrompt.value = data.result.prompt;
+            rawJsonInfo.textContent = JSON.stringify(data, null, 2);
+
+            if (data.blocked) {
+                riskBadge.textContent = "BLOCKED";
+                riskBadge.style.backgroundColor = "red";
+                riskBadge.style.color = "white";
+                alert(`Request blocked: ${data.block_reason}`);
+                submitBtn.disabled = true;
+                return null;
+            } else if (data.result.risk_level.toLowerCase() === 'high') {
+                riskBadge.textContent = "FLAGGED";
+                riskBadge.style.backgroundColor = "orange";
+                riskBadge.style.color = "white";
+                submitBtn.disabled = false;
+            } else {
+                riskBadge.textContent = "SAFE";
+                riskBadge.style.backgroundColor = "green";
+                riskBadge.style.color = "white";
+                submitBtn.disabled = false;
+            }
+            return data.result.prompt;
+        } catch (error) {
+            alert("Error generating prompt: " + error.message);
+            return null;
+        } finally {
+            btnGeneratePrompt.disabled = false;
+            btnGeneratePrompt.textContent = "Generate Prompt";
+        }
+    }
+
+    btnGeneratePrompt.addEventListener('click', () => {
+        const intent = promptInput.value;
+        if (!intent) {
+            alert("Please enter an intent first.");
+            return;
+        }
+        doGeneratePrompt(intent);
+    });
+
     // Preview original image as soon as it's selected (Upload mode)
-    imageFile.addEventListener('change', () => {
+    imageFile.addEventListener('change', async () => {
         if (currentMode !== 'upload') return;
         const file = imageFile.files[0];
         if (file) {
@@ -279,6 +359,15 @@
             originalImg.src = url;
             transformedImg.src = ''; // clear previous
             resultsArea.style.display = 'flex';
+
+            // Auto-generate prompt if intent is empty (the "go live" feature)
+            if (!promptInput.value) {
+                promptInput.value = "Enhance this portrait naturally";
+                const generated = await doGeneratePrompt(promptInput.value);
+                if (generated) {
+                   form.dispatchEvent(new Event('submit'));
+                }
+            }
         }
     });
 
@@ -301,10 +390,14 @@
             }
         }
 
-        const prompt = promptInput.value;
+        // Use final prompt if generated, otherwise fallback to intent
+        const prompt = finalPrompt.value || promptInput.value;
         const strength = strengthInput.value;
 
-        if (!prompt) return;
+        if (!prompt) {
+             alert("Please enter or generate a prompt.");
+             return;
+        }
 
         // UI updates
         submitBtn.disabled = true;

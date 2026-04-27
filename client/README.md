@@ -5,6 +5,7 @@ An API to apply AI styles to images using Stable Diffusion Turbo. This version h
 ## Features
 - Fast Image-to-Image transformation using `stabilityai/sd-turbo`
 - Hardware-bound license verification
+- OpenRouter Prompt Generation integration with safety checks
 - Production-ready Docker containerization (`Dockerfile` and `docker-compose.yml`)
 - Gunicorn setup with Uvicorn workers
 - Quick setup scripts for Windows and Linux/macOS
@@ -66,3 +67,27 @@ Available variables:
 - `PORT`: The port to run on (default: `8000`)
 - `GUNICORN_WORKERS`: Number of workers (default: `1`. Keep low for AI models to save memory)
 - `GUNICORN_TIMEOUT`: Worker timeout in seconds (default: `120`)
+
+## OpenRouter Integration
+This application integrates OpenRouter to dynamically generate advanced prompts for identity-preserving scene transformation.
+
+### Environment Variables
+To configure the OpenRouter service, set the following variables in your `.env` file:
+- `OPENROUTER_API_KEY`: Your OpenRouter API key.
+- `OPENROUTER_BASE_URL`: (Optional) Default is `https://openrouter.ai/api/v1`.
+- `OPENROUTER_MODEL`: (Optional) The model to use (default: `openai/gpt-4o-mini`).
+- `OPENROUTER_HTTP_REFERER`: (Optional) Identifying URL for OpenRouter ranking.
+- `OPENROUTER_X_TITLE`: (Optional) Identifying Title for OpenRouter ranking.
+
+### Features & Safety
+- **Structured JSON Output:** The prompt generator always yields structured data including negative prompts, scene descriptions, and safety flags.
+- **Safety Flags:** Strict deterministic and LLM-based safety checks prevent the generation of deceptive political content, impersonation of public figures, or NSFW content.
+- **Auto-Generate Pipeline:** In the Live Camera / Quick Upload mode, if the user doesn't provide a prompt, the system will automatically generate a prompt under the hood ("Enhance this portrait naturally") and trigger the pipeline.
+- **Fallback System:** If OpenRouter times out or errors, a deterministic backup prompt is constructed so the system remains operational.
+
+### Testing Locally
+Run tests utilizing `pytest`:
+```bash
+cd client
+python -m pytest tests/test_prompt_generation.py
+```
