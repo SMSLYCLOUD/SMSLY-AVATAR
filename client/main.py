@@ -12,6 +12,8 @@ import sys
 from ai_pipeline import get_transformer
 from license_manager import verify_license
 
+from routers import prompt
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -36,6 +38,9 @@ os.makedirs("static", exist_ok=True)
 
 # Mount the static directory to serve the frontend UI
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# Include Routers
+app.include_router(prompt.router, prefix="/api/prompt", tags=["Prompt Generation"])
 
 @app.on_event("startup")
 async def startup_event():
