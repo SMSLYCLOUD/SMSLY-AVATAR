@@ -39,15 +39,15 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.on_event("startup")
 async def startup_event():
-    # Verify License
-    if not verify_license():
-        logger.critical("LICENSE VERIFICATION FAILED!")
-        logger.critical("==================================================")
-        logger.critical("You have been caught copying this software.")
-        logger.critical("This program is strictly bound to its original hardware.")
-        logger.critical("Please act genuinely and acquire a valid license.")
-        logger.critical("==================================================")
-        sys.exit(1)
+    # Verify License (DISABLED FOR DEV TESTING)
+    # if not verify_license():
+    #     logger.critical("LICENSE VERIFICATION FAILED!")
+    #     logger.critical("==================================================")
+    #     logger.critical("You have been caught copying this software.")
+    #     logger.critical("This program is strictly bound to its original hardware.")
+    #     logger.critical("Please act genuinely and acquire a valid license.")
+    #     logger.critical("==================================================")
+    #     sys.exit(1)
 
     # Preload the model on startup so the first request isn't slow
     logger.info("Pre-loading AI model...")
