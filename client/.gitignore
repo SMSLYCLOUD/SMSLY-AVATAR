@@ -1,1 +1,6 @@
 main.log
+data/smsly_avatar.db
+data/avatar_uploads/
+*.db
+*.sqlite
+*.sqlite3

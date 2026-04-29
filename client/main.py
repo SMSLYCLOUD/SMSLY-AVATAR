@@ -33,14 +33,33 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Ensure static directory exists
+# Ensure directories exist
 os.makedirs("static", exist_ok=True)
+
+# Define and create Avatar uploads directories
+avatar_upload_dir = os.environ.get("SMSLY_AVATAR_UPLOAD_DIR", "./data/avatar_uploads")
+os.makedirs(os.path.join(avatar_upload_dir, "skins"), exist_ok=True)
+os.makedirs(os.path.join(avatar_upload_dir, "processed"), exist_ok=True)
+os.makedirs(os.path.join(avatar_upload_dir, "thumbnails"), exist_ok=True)
+
+# Ensure data directory exists for SQLite
+os.makedirs("./data", exist_ok=True)
+
+from avatar_db import Base, engine
+import avatar_models
+Base.metadata.create_all(bind=engine)
 
 # Mount the static directory to serve the frontend UI
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+# Mount avatar uploads safely
+app.mount("/avatar-media", StaticFiles(directory=avatar_upload_dir), name="avatar_media")
+
 # Include Routers
 app.include_router(prompt.router, prefix="/api/prompt", tags=["Prompt Generation"])
+
+from avatar_routes import router as avatar_router
+app.include_router(avatar_router, tags=["SMSLY Avatar"])
 
 @app.on_event("startup")
 async def startup_event():
