@@ -36,6 +36,16 @@ async def test_deterministic_safety_block(service):
     assert result.safety_flags.public_figure_risk is True
 
 @pytest.mark.asyncio
+async def test_deterministic_safety_block_elon(service):
+    request = PromptGenerationRequest(user_prompt="elon, high quality, detailed")
+    result, meta = await service.generate_prompt(request)
+
+    assert meta["blocked"] is True
+    assert meta["block_reason"] == "Public figure impersonation detected"
+    assert result.risk_level == "high"
+    assert result.safety_flags.public_figure_risk is True
+
+@pytest.mark.asyncio
 async def test_fallback_on_llm_failure():
     failing_router = MockOpenRouterService(should_fail=True)
     service = PromptGenerationService(failing_router)

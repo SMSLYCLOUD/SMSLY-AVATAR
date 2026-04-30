@@ -14,3 +14,16 @@ node_modules/
 .DS_Store
 Thumbs.db
 license.key
+data/
+*.db
+*.sqlite
+*.sqlite3
+output.log
+dummy.jpg
+client/data/
+client/output.log
+client/dummy.jpg
+__pycache__/
+.pytest_cache/
+.venv/
+venv/

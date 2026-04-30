@@ -13,6 +13,13 @@ from avatar_schemas import (
 from avatar_auth import get_current_avatar_user
 from avatar_storage import save_avatar_upload
 from avatar_moderation import moderate_avatar_upload, moderate_avatar_prompt, create_moderation_result
+import os
+from io import BytesIO
+from PIL import Image
+from ai_pipeline import get_transformer
+import time
+from pydantic import BaseModel
+import httpx
 
 router = APIRouter()
 
@@ -133,6 +140,88 @@ def revoke_consent(id: str, db: Session = Depends(get_db), current_user: str = D
     db.commit()
     return {"ok": True}
 
+@router.post("/api/avatar/skins/{id}/generate-preview")
+async def generate_preview(
+    id: str,
+    file: UploadFile = File(...),
+    prompt: str = Form(...),
+    strength: float = Form(0.6),
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_avatar_user)
+):
+    # Confirm skin ownership
+    skin = db.query(AvatarSkin).filter(AvatarSkin.id == id, AvatarSkin.user_id == current_user).first()
+    if not skin:
+        raise HTTPException(status_code=404, detail="Skin not found.")
+
+    # Confirm skin consent
+    if skin.consent_status != "confirmed":
+        raise HTTPException(status_code=400, detail="Skin consent must be confirmed.")
+
+    # Confirm moderation
+    if skin.moderation_status != "approved":
+        raise HTTPException(status_code=400, detail="Skin must be approved.")
+
+    # Prompt safety check
+    status, reason = moderate_avatar_prompt(prompt, current_user)
+    if status != "approved":
+        raise HTTPException(status_code=400, detail=f"Prompt rejected: {reason}")
+
+    if not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="File must be an image.")
+
+    try:
+        # Read the uploaded image
+        image_bytes = await file.read()
+        init_image = Image.open(BytesIO(image_bytes))
+
+        # Get the AI transformer
+        transformer = get_transformer()
+
+        # Transform the image
+        start_time = time.time()
+        try:
+            result_image = transformer.transform_image(init_image, prompt, strength=strength)
+        except Exception as e:
+            if str(e) == "AVATAR_GENERATION_BUSY":
+                raise HTTPException(status_code=429, detail="Avatar generation is already running. Please try again in a moment.")
+            raise e
+        generation_time = time.time() - start_time
+
+        # Save output into data/avatar_uploads/processed/
+        avatar_upload_dir = os.environ.get("SMSLY_AVATAR_UPLOAD_DIR", "./data/avatar_uploads")
+        processed_dir = os.path.join(avatar_upload_dir, "processed")
+        os.makedirs(processed_dir, exist_ok=True)
+
+        filename = f"processed_{uuid.uuid4().hex}_{int(time.time())}.jpg"
+        filepath = os.path.join(processed_dir, filename)
+
+        result_image.save(filepath, format="JPEG", quality=90)
+        processed_asset_url = f"/avatar-media/processed/{filename}"
+
+        # Update AvatarSkin.processed_asset_url
+        skin.processed_asset_url = processed_asset_url
+
+        # Write AvatarAuditLog action="generate_preview"
+        log_audit(db, current_user, "generate_preview", "skin", id, {"prompt": prompt, "strength": strength, "asset_url": processed_asset_url})
+
+        db.commit()
+        db.refresh(skin)
+
+        session = db.query(AvatarSession).filter(AvatarSession.user_id == current_user).first()
+
+        return {
+            "skin": AvatarSkinResponse.model_validate(skin).model_dump(),
+            "session": AvatarSessionResponse.model_validate(session).model_dump() if session else None,
+            "performance": {
+                "device": get_transformer().device,
+                "generation_time": round(generation_time, 2)
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # --- SESSIONS ---
 
@@ -273,6 +362,77 @@ def regenerate_token(db: Session = Depends(get_db), current_user: str = Depends(
     log_audit(db, current_user, "regenerate_token", "session", session.id)
     db.commit()
     return {"ok": True, "token": session.overlay_token}
+
+# --- OPENROUTER / PROMPTS ---
+
+class PromptGenerateRequest(BaseModel):
+    idea: str
+    style: Optional[str] = "cinematic"
+    negative_prompt: Optional[str] = ""
+    model: Optional[str] = "openai/gpt-4o-mini"
+    openrouter_api_key: Optional[str] = None
+
+@router.post("/api/avatar/prompts/generate")
+async def generate_prompt(req: PromptGenerateRequest, current_user: str = Depends(get_current_avatar_user)):
+    # 1. Local Safety Check
+    status, reason = moderate_avatar_prompt(req.idea, current_user)
+    if status != "approved":
+        raise HTTPException(status_code=400, detail=f"Idea rejected: {reason}")
+
+    # 2. Get API Key
+    api_key = os.environ.get("OPENROUTER_API_KEY")
+    allow_browser = os.environ.get("SMSLY_AVATAR_ALLOW_BROWSER_OPENROUTER_KEY", "true").lower() == "true"
+
+    if allow_browser and req.openrouter_api_key:
+        api_key = req.openrouter_api_key
+
+    if not api_key:
+        raise HTTPException(status_code=400, detail="OpenRouter API key not configured")
+
+    model_to_use = req.model or os.environ.get("SMSLY_AVATAR_PROMPT_MODEL", "openai/gpt-4o-mini")
+
+    system_prompt = "You generate safe, original SMSLY Avatar style prompts for synthetic creator avatars. Do not imitate or reference real public figures, celebrities, politicians, private people, or named individuals. Do not create deepfake, deception, or identity-cloning prompts. Create original avatar style descriptions suitable for consent-based image transformation. Keep prompts concise, visual, and production-ready. Always include a watermark/synthetic framing description if relevant. Only return the actual prompt string, do not output conversational text."
+
+    user_prompt = f"Idea: {req.idea}\nStyle: {req.style}"
+
+    try:
+        async with httpx.AsyncClient() as client:
+            res = await client.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "HTTP-Referer": "https://smsly.ai",
+                    "X-Title": "SMSLY Avatar"
+                },
+                json={
+                    "model": model_to_use,
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt}
+                    ]
+                },
+                timeout=15.0
+            )
+            res.raise_for_status()
+            data = res.json()
+
+            generated_prompt = data["choices"][0]["message"]["content"].strip()
+
+            # Post-generation local moderation check
+            status2, reason2 = moderate_avatar_prompt(generated_prompt, current_user)
+            if status2 != "approved":
+                 raise HTTPException(status_code=400, detail=f"Generated prompt rejected by safety layer: {reason2}")
+
+            return {
+                "ok": True,
+                "prompt": generated_prompt,
+                "negative_prompt": req.negative_prompt,
+                "safety_notes": ["Cleared local safety checks"]
+            }
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(status_code=e.response.status_code, detail=f"OpenRouter API error: {e.response.text}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Prompt generation failed: {str(e)}")
 
 # --- AUDIT LOGS ---
 

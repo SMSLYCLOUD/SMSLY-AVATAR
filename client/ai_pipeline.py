@@ -3,11 +3,16 @@ from diffusers import AutoPipelineForImage2Image
 from diffusers.utils import load_image
 from PIL import Image
 import logging
+import threading
+import hashlib
+import os
 
 logger = logging.getLogger(__name__)
 
 class ImageTransformer:
     def __init__(self):
+        self.lock = threading.Lock()
+        self.cache = {}
         # Determine the device to run on
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         logger.info(f"Loading model on {self.device}...")
@@ -53,20 +58,47 @@ class ImageTransformer:
         height = (height // 8) * 8
         init_image = init_image.resize((width, height), Image.Resampling.LANCZOS)
 
+        # Fast inference parameters
+        fast_steps = int(os.environ.get("SMSLY_AVATAR_FAST_STEPS", num_inference_steps))
+        fast_strength = float(os.environ.get("SMSLY_AVATAR_FAST_STRENGTH", strength))
+        fast_guidance = float(os.environ.get("SMSLY_AVATAR_FAST_GUIDANCE", 0.0))
+
         # Enhance the prompt with some quality boosters
         full_prompt = f"{prompt}, highly detailed, best quality, 8k"
 
-        # Generate image
-        # Note: guidance_scale is typically 0.0 for SD-Turbo as per model card
-        result = self.pipeline(
-            prompt=full_prompt,
-            image=init_image,
-            num_inference_steps=num_inference_steps,
-            strength=strength,
-            guidance_scale=0.0
-        ).images[0]
+        # Check Cache
+        img_hash = hashlib.md5(init_image.tobytes()).hexdigest()
+        req_hash = f"{img_hash}_{full_prompt}_{fast_strength}_{fast_steps}_{fast_guidance}"
 
-        return result
+        if req_hash in self.cache:
+            logger.info("Returning cached processed image.")
+            return self.cache[req_hash]
+
+        # Check if generation is currently busy
+        if not self.lock.acquire(blocking=False):
+            raise Exception("AVATAR_GENERATION_BUSY")
+
+        try:
+            # Generate image
+            with torch.inference_mode():
+                # Note: guidance_scale is typically 0.0 for SD-Turbo as per model card
+                result = self.pipeline(
+                    prompt=full_prompt,
+                    image=init_image,
+                    num_inference_steps=fast_steps,
+                    strength=fast_strength,
+                    guidance_scale=fast_guidance
+                ).images[0]
+
+            self.cache[req_hash] = result
+
+            # Simple cache size management to prevent OOM
+            if len(self.cache) > 20:
+                self.cache.pop(next(iter(self.cache)))
+
+            return result
+        finally:
+            self.lock.release()
 
 # Singleton instance to be imported by the API
 # In a real production app, this might be loaded differently to handle multiple workers.
