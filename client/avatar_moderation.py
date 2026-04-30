@@ -2,10 +2,11 @@ import uuid
 from typing import Dict, Any, Tuple
 
 LOCAL_BLOCKED_TERMS = [
-    "trump", "biden", "obama", "putin", "zelensky", "elon musk", "mark zuckerberg", "sam altman", "kanye", "taylor swift",
-    "impersonate", "deepfake", "clone", "make me look exactly like", "pretend to be", "fake identity",
-    "bypass detection", "remove watermark", "undetectable deepfake", "fool people", "fake livestream",
-    "without consent", "make someone else", "use this person's face", "celebrity", "politician", "public figure"
+    "elon", "musk", "trump", "biden", "obama", "putin", "zelensky", "zuckerberg", "sam altman", "taylor swift", "kanye",
+    "celebrity", "politician", "public figure", "impersonate", "deepfake", "clone", "exact face",
+    "make me look exactly like", "pretend to be", "fake identity", "bypass detection", "remove watermark",
+    "undetectable deepfake", "fool people", "fake livestream", "without consent", "make someone else",
+    "use this person's face", "undetectable"
 ]
 
 def detect_impersonation_terms(text: str) -> bool:

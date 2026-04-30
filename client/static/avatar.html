@@ -29,7 +29,7 @@
         <aside class="w-80 bg-gray-800/50 border-r border-gray-700 flex flex-col overflow-y-auto">
 
             <!-- Tabs -->
-            <div class="flex border-b border-gray-700 p-2 gap-1">
+            <div class="flex border-b border-gray-700 p-2 gap-1 shrink-0">
                 <button id="tab-btn-skins" class="flex-1 py-2 text-sm font-medium bg-gray-700 rounded-md text-white transition-colors" onclick="switchTab('skins')">IRL Skins</button>
                 <button id="tab-btn-playground" class="flex-1 py-2 text-sm font-medium text-gray-400 hover:text-gray-200 hover:bg-gray-700/50 rounded-md transition-colors" onclick="switchTab('playground')">Playground</button>
                 <button id="tab-btn-settings" class="flex-1 py-2 text-sm font-medium text-gray-400 hover:text-gray-200 hover:bg-gray-700/50 rounded-md transition-colors" onclick="switchTab('settings')">Settings</button>
@@ -51,9 +51,32 @@
             <!-- Tab Content: Playground -->
             <div id="tab-playground" class="p-4 hidden flex-col gap-4">
                 <h2 class="text-sm font-semibold text-gray-300 uppercase tracking-wider">Avatar Playground</h2>
-                <textarea id="prompt-input" rows="3" class="w-full bg-gray-900 border border-gray-700 rounded-lg p-3 text-sm focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors" placeholder="Describe an avatar look..."></textarea>
-                <p class="text-xs text-gray-500">Requests violating impersonation rules will be rejected.</p>
-                <button class="w-full py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-medium transition-colors" onclick="alert('Playground text generation requires an active AI provider. Currently only /api/transform exists for images.')">Generate Skin</button>
+
+                <div class="flex flex-col gap-1">
+                    <label class="text-xs text-gray-400">Idea</label>
+                    <textarea id="playground-idea" rows="3" class="w-full bg-gray-900 border border-gray-700 rounded-lg p-3 text-sm focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors" placeholder="e.g. cyberpunk streamer with neon jacket"></textarea>
+                </div>
+
+                <div class="flex flex-col gap-1">
+                    <label class="text-xs text-gray-400">Style</label>
+                    <select id="playground-style" class="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-sm text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500">
+                        <option value="cinematic">Cinematic</option>
+                        <option value="anime">Anime / Illustration</option>
+                        <option value="3d_render">3D Render</option>
+                        <option value="photorealistic">Photorealistic</option>
+                    </select>
+                </div>
+
+                <div id="playground-error" class="text-red-400 text-sm hidden"></div>
+
+                <button id="btn-generate-prompt" class="w-full py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-medium transition-colors" onclick="generatePlaygroundPrompt()">Generate Prompt</button>
+
+                <div id="playground-result-container" class="hidden flex-col gap-2 mt-4 pt-4 border-t border-gray-700">
+                    <label class="text-xs text-gray-400">Generated Prompt</label>
+                    <textarea id="playground-generated-prompt" rows="4" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 text-xs text-gray-200" readonly></textarea>
+
+                    <button class="w-full py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg font-medium transition-colors text-sm" onclick="useGeneratedPrompt()">Copy Prompt</button>
+                </div>
             </div>
 
             <!-- Tab Content: Settings -->
@@ -77,7 +100,34 @@
 
                 <h2 class="text-sm font-semibold text-gray-300 uppercase tracking-wider mt-4">Settings</h2>
                 <div class="flex flex-col gap-4">
-                    <div class="flex items-center justify-between">
+                    <!-- Prompt Generation Provider -->
+                    <div class="flex flex-col gap-2 mt-2 pt-4 border-t border-gray-700">
+                        <h3 class="text-sm font-semibold text-gray-300">Prompt Generation Provider</h3>
+                        <label class="text-xs text-gray-400">OpenRouter API Key</label>
+                        <div class="flex gap-2">
+                            <input type="password" id="openrouter-key" placeholder="sk-or-v1-..." class="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-300">
+                            <button class="px-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm transition-colors" onclick="toggleOpenRouterKeyVisibility()">👁</button>
+                        </div>
+                        <div class="flex gap-2 mt-1">
+                            <button class="flex-1 py-1 bg-purple-600 hover:bg-purple-500 rounded text-xs font-medium transition-colors" onclick="saveOpenRouterKey()">Save</button>
+                            <button class="flex-1 py-1 bg-red-600/50 hover:bg-red-500/50 rounded text-xs font-medium transition-colors" onclick="clearOpenRouterKey()">Clear</button>
+                        </div>
+                        <p id="openrouter-status" class="text-[10px] text-gray-500 mt-1">Status: Not configured (Demo/local only)</p>
+
+                        <label class="text-xs text-gray-400 mt-2">Model Selector</label>
+                        <select id="openrouter-model" class="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-sm text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500">
+                            <option value="openai/gpt-4o-mini">openai/gpt-4o-mini</option>
+                            <option value="openai/gpt-4.1-mini">openai/gpt-4.1-mini</option>
+                            <option value="anthropic/claude-3.5-haiku">anthropic/claude-3.5-haiku</option>
+                            <option value="google/gemini-2.0-flash-001">google/gemini-2.0-flash-001</option>
+                            <option value="qwen/qwen-2.5-72b-instruct">qwen/qwen-2.5-72b-instruct</option>
+                            <option value="meta-llama/llama-3.3-70b-instruct">meta-llama/llama-3.3-70b-instruct</option>
+                            <option value="custom">Custom...</option>
+                        </select>
+                        <input type="text" id="openrouter-model-custom" placeholder="Enter custom model id" class="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-sm text-white hidden mt-1">
+                    </div>
+
+                    <div class="flex items-center justify-between mt-2 pt-4 border-t border-gray-700">
                         <span class="text-sm text-gray-300">Synthetic Watermark</span>
                         <input type="checkbox" checked disabled class="bg-gray-700 border-gray-600 rounded text-purple-600 focus:ring-purple-500">
                     </div>
@@ -142,12 +192,21 @@
                     </div>
 
                     <div class="flex items-center gap-3">
-                        <button id="btn-generate-preview" class="px-4 py-2.5 bg-gray-700 hover:bg-gray-600 text-white text-sm font-medium rounded-lg border border-gray-600 transition-colors flex items-center gap-2" onclick="generatePreviewFrame()" disabled>
-                            Generate Frame Preview
-                        </button>
-                        <button id="btn-apply-skin" class="px-6 py-2.5 bg-green-600 hover:bg-green-500 text-white font-medium rounded-lg transition-colors flex items-center gap-2" onclick="activateSelectedSkin()" disabled>
-                            Apply Selected Skin
-                        </button>
+                        <div class="flex bg-gray-900 rounded-lg p-1 border border-gray-700 mr-2">
+                            <button id="btn-mode-camera" class="px-3 py-1.5 text-sm font-medium rounded-md bg-gray-700 text-white transition-colors" onclick="setPreviewMode('camera')">Camera</button>
+                            <button id="btn-mode-avatar" class="px-3 py-1.5 text-sm font-medium rounded-md text-gray-400 hover:text-gray-200 transition-colors" onclick="setPreviewMode('avatar_output')">Avatar Output</button>
+                        </div>
+                        <div class="flex flex-col items-end">
+                            <div class="flex items-center gap-3">
+                                <button id="btn-generate-preview" class="px-4 py-2.5 bg-gray-700 hover:bg-gray-600 text-white text-sm font-medium rounded-lg border border-gray-600 transition-colors flex items-center gap-2" onclick="generatePreviewFrame()" disabled>
+                                    Generate Frame Preview
+                                </button>
+                                <button id="btn-apply-skin" class="px-6 py-2.5 bg-green-600 hover:bg-green-500 text-white font-medium rounded-lg transition-colors flex items-center gap-2" onclick="activateSelectedSkin()" disabled>
+                                    Apply Selected Skin
+                                </button>
+                            </div>
+                            <span id="performance-badge" class="text-[10px] text-gray-500 mt-1 hidden"></span>
+                        </div>
                     </div>
                 </div>
 

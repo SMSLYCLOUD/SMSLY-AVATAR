@@ -81,7 +81,7 @@ class PromptGenerationService:
 
         # Naive keyword checks for demonstration
         nsfw_keywords = ["naked", "nude", "sex", "erotic", "porn"]
-        public_figure_keywords = ["biden", "trump", "elon musk", "taylor swift", "celebrity"]
+        public_figure_keywords = ["elon", "musk", "trump", "biden", "obama", "putin", "zelensky", "zuckerberg", "sam altman", "taylor swift", "kanye", "celebrity", "politician", "public figure"]
         minor_keywords = ["child", "kid", "toddler", "minor", "underage"]
         deception_keywords = ["fake evidence", "arrested", "mugshot", "crime scene", "news report"]
 

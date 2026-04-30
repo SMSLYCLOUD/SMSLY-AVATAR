@@ -66,6 +66,36 @@ def test_impersonation_moderation():
     assert detect_impersonation_terms("make me look like joe biden") == True
     assert detect_impersonation_terms("a cool cyberpunk streamer") == False
     assert detect_impersonation_terms("I want to impersonate my boss") == True
+    assert detect_impersonation_terms("elon, high quality, detailed") == True
+    assert detect_impersonation_terms("Make me look like elon musk") == True
+    assert detect_impersonation_terms("clone someone else") == True
+
+def test_generate_preview_fails_without_consent():
+    file = create_valid_image_bytes()
+
+    # Create skin without consent
+    response = client.post(
+        "/api/avatar/skins",
+        headers=headers,
+        data={
+            "name": "Another Skin",
+            "source_type": "upload",
+            "consent_status": "pending"
+        },
+        files={"file": ("test2.png", file, "image/png")}
+    )
+    skin_id = response.json()["id"]
+
+    # Attempt generate-preview
+    preview_res = client.post(
+        f"/api/avatar/skins/{skin_id}/generate-preview",
+        headers=headers,
+        data={"prompt": "cyberpunk avatar, high quality"},
+        files={"file": ("frame.jpg", create_valid_image_bytes(), "image/jpeg")}
+    )
+
+    assert preview_res.status_code == 400
+    assert "consent must be confirmed" in preview_res.json()["detail"]
 
 def test_activate_rejected_skin():
     # Attempting to activate a skin with rejected moderation should fail
