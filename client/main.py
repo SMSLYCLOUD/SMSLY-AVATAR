@@ -45,9 +45,13 @@ os.makedirs(os.path.join(avatar_upload_dir, "thumbnails"), exist_ok=True)
 # Ensure data directory exists for SQLite
 os.makedirs("./data", exist_ok=True)
 
-from avatar_db import Base, engine
+from avatar_db import Base, engine, SessionLocal, seed_demo_skins
 import avatar_models
 Base.metadata.create_all(bind=engine)
+
+# Seed demo data if database is empty
+with SessionLocal() as db:
+    seed_demo_skins(db)
 
 # Mount the static directory to serve the frontend UI
 app.mount("/static", StaticFiles(directory="static"), name="static")
