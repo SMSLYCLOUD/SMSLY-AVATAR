@@ -1,0 +1,41 @@
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [194439]
+[transformers] `Siglip2ImageProcessorFast` is deprecated. The `Fast` suffix for image processors has been removed; use `Siglip2ImageProcessor` instead.
+/app/client/main.py:64: DeprecationWarning:
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+
+  @app.on_event("startup")
+INFO:     Started server process [215868]
+INFO:     Waiting for application startup.
+2026-04-29 20:55:12,051 - __main__ - INFO - Pre-loading AI model...
+2026-04-29 20:55:12,051 - __main__ - INFO - API is ready.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:32946 - "GET /static/avatar.html HTTP/1.1" 200 OK
+INFO:     127.0.0.1:32946 - "GET /static/avatar.css HTTP/1.1" 200 OK
+INFO:     127.0.0.1:32946 - "GET /static/avatar.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:32946 - "GET /api/avatar/skins HTTP/1.1" 200 OK
+INFO:     127.0.0.1:32960 - "GET /api/avatar/session HTTP/1.1" 200 OK
+INFO:     127.0.0.1:32960 - "POST /api/avatar/skins HTTP/1.1" 200 OK
+INFO:     127.0.0.1:32960 - "GET /api/avatar/skins HTTP/1.1" 200 OK
+INFO:     127.0.0.1:32960 - "GET /avatar-media/skins/7f59ffb0b93443dbafc96c79542b9994.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:32960 - "POST /api/avatar/skins/3cd9d86678174906bdfd6107716318ce/activate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:32960 - "GET /api/avatar/skins HTTP/1.1" 200 OK
+INFO:     127.0.0.1:32960 - "GET /api/avatar/session HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41874 - "GET /static/avatar.html HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41874 - "GET /static/avatar.css HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41884 - "GET /static/avatar.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41884 - "GET /api/avatar/skins HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41874 - "GET /api/avatar/session HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41874 - "GET /avatar-media/skins/7f59ffb0b93443dbafc96c79542b9994.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41874 - "POST /api/avatar/skins HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41874 - "GET /api/avatar/skins HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41874 - "GET /avatar-media/skins/cefd0c90555645a09ba0ecf887701336.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41874 - "POST /api/avatar/skins/3cd9d86678174906bdfd6107716318ce/activate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41874 - "GET /api/avatar/skins HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41874 - "GET /api/avatar/session HTTP/1.1" 200 OK
